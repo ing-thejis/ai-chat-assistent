@@ -29,9 +29,11 @@ export function useAuth() {
   })
 
   // Suscripción a cambios de estado: login, logout, token refresh
-  const { data: authListener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-    session.value = newSession
-  })
+  const { data: authListener } = supabase.auth.onAuthStateChange(
+    (_event, newSession) => {
+      session.value = newSession
+    },
+  )
 
   onUnmounted(() => {
     authListener.subscription.unsubscribe()
@@ -52,13 +54,18 @@ export function useAuth() {
     try {
       const { error: authError } = await supabase.auth.signInWithOtp({
         email,
-        options: { shouldCreateUser: true },
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: "https://ing-thejis.github.io",
+        },
       })
       if (authError) throw authError
       return true
     } catch (e: unknown) {
       error.value =
-        e instanceof Error ? e.message : "No se pudo enviar el código. Inténtalo de nuevo."
+        e instanceof Error
+          ? e.message
+          : "No se pudo enviar el código. Inténtalo de nuevo."
       return false
     } finally {
       isLoading.value = false
@@ -87,7 +94,9 @@ export function useAuth() {
       return true
     } catch (e: unknown) {
       error.value =
-        e instanceof Error ? e.message : "Código incorrecto o expirado. Inténtalo de nuevo."
+        e instanceof Error
+          ? e.message
+          : "Código incorrecto o expirado. Inténtalo de nuevo."
       return false
     } finally {
       isLoading.value = false
@@ -105,8 +114,7 @@ export function useAuth() {
       const { error: authError } = await supabase.auth.signOut()
       if (authError) throw authError
     } catch (e: unknown) {
-      error.value =
-        e instanceof Error ? e.message : "Error al cerrar sesión."
+      error.value = e instanceof Error ? e.message : "Error al cerrar sesión."
     } finally {
       isLoading.value = false
     }
