@@ -56,6 +56,7 @@ export function useAuth() {
         email: normalizedEmail,
         options: {
           shouldCreateUser: false,
+          emailRedirectTo: "https://ing-thejis.github.io/ai-chat-assistent/",
         },
       })
       if (authError) throw authError
@@ -72,7 +73,8 @@ export function useAuth() {
         error.value =
           "Este correo no está autorizado para acceder. Usa un correo registrado."
       } else {
-        error.value = message || "No se pudo enviar el código. Inténtalo de nuevo."
+        error.value =
+          message || "No se pudo enviar el código. Inténtalo de nuevo."
       }
       return false
     } finally {
