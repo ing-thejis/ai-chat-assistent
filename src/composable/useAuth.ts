@@ -41,8 +41,7 @@ export function useAuth() {
 
   /**
    * Envía un OTP de 6 dígitos al correo indicado.
-   * Supabase también puede enviar un magic link — el OTP es el código numérico
-   * que aparece en el mismo email.
+   * Solo permite acceso para correos ya registrados en Supabase Auth.
    *
    * @param email - Correo electrónico del usuario.
    * @returns `true` si el envío fue exitoso, `false` si hubo error.
@@ -52,20 +51,29 @@ export function useAuth() {
     error.value = null
 
     try {
+      const normalizedEmail = email.trim().toLowerCase()
       const { error: authError } = await supabase.auth.signInWithOtp({
-        email,
+        email: normalizedEmail,
         options: {
-          shouldCreateUser: true,
-          emailRedirectTo: "https://ing-thejis.github.io",
+          shouldCreateUser: false,
         },
       })
       if (authError) throw authError
       return true
     } catch (e: unknown) {
-      error.value =
-        e instanceof Error
-          ? e.message
-          : "No se pudo enviar el código. Inténtalo de nuevo."
+      const message = e instanceof Error ? e.message : ""
+      const normalizedMessage = message.toLowerCase()
+
+      if (
+        normalizedMessage.includes("signup") ||
+        normalizedMessage.includes("sign up") ||
+        normalizedMessage.includes("not allowed")
+      ) {
+        error.value =
+          "Este correo no está autorizado para acceder. Usa un correo registrado."
+      } else {
+        error.value = message || "No se pudo enviar el código. Inténtalo de nuevo."
+      }
       return false
     } finally {
       isLoading.value = false
@@ -85,8 +93,9 @@ export function useAuth() {
     error.value = null
 
     try {
+      const normalizedEmail = email.trim().toLowerCase()
       const { error: authError } = await supabase.auth.verifyOtp({
-        email,
+        email: normalizedEmail,
         token,
         type: "email",
       })

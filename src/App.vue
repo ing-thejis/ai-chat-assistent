@@ -19,7 +19,6 @@ import { useAuth } from "./composable/useAuth"
 const { messages, isLoading, error, sendMessage, clearChat } = useChat()
 const { session, isLoading: authLoading, signOut } = useAuth()
 
-
 /** Referencia al elemento centinela al final del chat, usado para el auto-scroll. */
 const chatEnd = ref<HTMLElement | null>(null)
 
@@ -28,10 +27,14 @@ const chatEnd = ref<HTMLElement | null>(null)
  * actualizaciones de contenido durante el streaming) y desplaza la vista
  * suavemente hasta el último mensaje tras el siguiente ciclo de renderizado.
  */
-watch(messages, async () => {
-  await nextTick()
-  chatEnd.value?.scrollIntoView({ behavior: "smooth" })
-}, { deep: true })
+watch(
+  messages,
+  async () => {
+    await nextTick()
+    chatEnd.value?.scrollIntoView({ behavior: "smooth" })
+  },
+  { deep: true },
+)
 </script>
 
 <template>
@@ -43,7 +46,12 @@ watch(messages, async () => {
     <template v-else>
       <header>
         <h1>✨ AI Chat</h1>
-        <button class="btn-signout" :disabled="authLoading" @click="signOut" title="Cerrar sesión">
+        <button
+          class="btn-signout"
+          :disabled="authLoading"
+          @click="signOut"
+          title="Cerrar sesión"
+        >
           <LogOut :size="16" />
           <span>Salir</span>
         </button>
@@ -51,14 +59,13 @@ watch(messages, async () => {
 
       <main class="chat-window">
         <div v-if="messages.length === 0" class="empty-state">
-          <p>👋 ¡Hola! Soy Kora, un agente de IA que usa modelos de Google Gemini. ¿En qué puedo ayudarte?</p>
+          <p>
+            👋 ¡Hola! Soy Kora, un agente de IA que usa modelos de Google
+            Gemini. ¿En qué puedo ayudarte?
+          </p>
         </div>
 
-        <ChatMessage
-          v-for="msg in messages"
-          :key="msg.id"
-          :message="msg"
-        />
+        <ChatMessage v-for="msg in messages" :key="msg.id" :message="msg" />
 
         <div v-if="error" class="error">{{ error }}</div>
         <div ref="chatEnd" />
@@ -102,7 +109,9 @@ header h1 {
   color: #555;
   font-size: 0.8rem;
   cursor: pointer;
-  transition: background-color 0.2s, color 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
 }
 
 .btn-signout:hover:not(:disabled) {
