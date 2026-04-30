@@ -10,47 +10,42 @@
  */
 
 import { ref, computed } from "vue"
-import { Mail, ArrowRight, KeyRound, RotateCcw } from "@lucide/vue"
+import { Mail, ArrowRight, KeyRound, RotateCcw, Sparkles } from "@lucide/vue"
 import { useAuth } from "../composable/useAuth"
+import { useTheme } from "../composable/useTheme"
 
 const { isLoading, error, sendOtp, verifyOtp } = useAuth()
+const { current: theme, toggleTheme } = useTheme()
 
-// ── Estado del formulario ──────────────────────────────────────────────────
 type Step = "email" | "otp"
 const step = ref<Step>("email")
-
 const email = ref("")
 const otp = ref("")
 
-// ── Validaciones ──────────────────────────────────────────────────────────
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const isEmailValid = computed(() => emailRegex.test(email.value.trim()))
 const isOtpValid = computed(() => /^\d{6}$/.test(otp.value.trim()))
 
-// ── Acciones ──────────────────────────────────────────────────────────────
+const themeLabel = computed(() =>
+  theme.value === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"
+)
 
-/** Paso 1: envía el OTP al correo. */
 const handleSendOtp = async () => {
   if (!isEmailValid.value || isLoading.value) return
   const ok = await sendOtp(email.value.trim())
   if (ok) step.value = "otp"
 }
 
-/** Paso 2: verifica el código OTP ingresado. */
 const handleVerifyOtp = async () => {
   if (!isOtpValid.value || isLoading.value) return
   await verifyOtp(email.value.trim(), otp.value.trim())
-  // Si es correcto, onAuthStateChange en useAuth actualiza `session`
-  // y App.vue deja de mostrar LoginView automáticamente.
 }
 
-/** Vuelve al paso 1 para cambiar el correo o reenviar el código. */
 const handleBack = () => {
   step.value = "email"
   otp.value = ""
 }
 
-/** Permite enviar con Enter en los inputs. */
 const handleEmailKeydown = (e: KeyboardEvent) => {
   if (e.key === "Enter") handleSendOtp()
 }
@@ -62,93 +57,169 @@ const handleOtpKeydown = (e: KeyboardEvent) => {
 
 <template>
   <div class="login-wrapper">
-    <div class="login-card">
+    <!-- Toggle de tema esquina superior derecha -->
+    <button
+      class="theme-toggle"
+      :aria-label="themeLabel"
+      :title="themeLabel"
+      @click="toggleTheme"
+    >
+      <span aria-hidden="true">{{ theme === 'dark' ? '☀️' : '🌙' }}</span>
+    </button>
 
-      <!-- Ícono y título -->
-      <div class="login-icon">✨</div>
-      <h1>AI Chat</h1>
+    <div
+      class="login-card"
+      role="main"
+      aria-label="Iniciar sesión en Kora"
+    >
+      <!-- Logo y marca -->
+      <div class="login-logo" aria-hidden="true">
+        <Sparkles :size="28" />
+      </div>
+      <div class="login-brand">
+        <h1 class="login-title">Kora</h1>
+        <span class="login-subtitle-badge">AI Chat</span>
+      </div>
 
-      <!-- ── Paso 1: Email ── -->
-      <template v-if="step === 'email'">
-        <p class="subtitle">
-          Ingresa tu correo electrónico para recibir un código de acceso.
-        </p>
+      <!-- Indicador de pasos -->
+      <div class="steps-indicator" role="progressbar" :aria-valuenow="step === 'email' ? 1 : 2" aria-valuemin="1" aria-valuemax="2" :aria-label="`Paso ${step === 'email' ? 1 : 2} de 2`">
+        <div :class="['step-dot', { active: true }]" aria-hidden="true" />
+        <div class="step-line" aria-hidden="true" />
+        <div :class="['step-dot', { active: step === 'otp' }]" aria-hidden="true" />
+      </div>
 
-        <div class="input-group">
-          <label for="email-input">Correo electrónico</label>
-          <div class="input-wrapper" :class="{ invalid: email && !isEmailValid }">
-            <Mail :size="16" class="input-icon" />
-            <input
-              id="email-input"
-              v-model="email"
-              type="email"
-              placeholder="tu@correo.com"
-              autocomplete="email"
-              :disabled="isLoading"
-              @keydown="handleEmailKeydown"
-            />
+      <!-- ── Paso 1: Email ─────────────────────────────────────────── -->
+      <Transition name="slide" mode="out-in">
+        <div v-if="step === 'email'" key="email-step" class="step-content">
+          <p class="step-description">
+            Ingresa tu correo para recibir un código de acceso seguro.
+          </p>
+
+          <div class="form-group">
+            <label for="email-input" class="form-label">
+              Correo electrónico
+            </label>
+            <div
+              class="input-wrapper"
+              :class="{
+                'input-wrapper--invalid': email && !isEmailValid,
+                'input-wrapper--valid': email && isEmailValid,
+              }"
+            >
+              <Mail :size="15" class="input-icon" aria-hidden="true" />
+              <input
+                id="email-input"
+                v-model="email"
+                type="email"
+                placeholder="tu@correo.com"
+                autocomplete="email"
+                :disabled="isLoading"
+                aria-required="true"
+                :aria-invalid="email && !isEmailValid ? 'true' : 'false'"
+                aria-describedby="email-error"
+                @keydown="handleEmailKeydown"
+              />
+            </div>
+            <p
+              v-if="email && !isEmailValid"
+              id="email-error"
+              class="field-error"
+              role="alert"
+            >
+              Ingresa un correo electrónico válido.
+            </p>
           </div>
-          <span v-if="email && !isEmailValid" class="field-error">
-            Ingresa un correo válido.
-          </span>
+
+          <button
+            type="submit"
+            class="btn-primary"
+            :disabled="!isEmailValid || isLoading"
+            :aria-busy="isLoading"
+            @click="handleSendOtp"
+          >
+            <span class="btn-spinner" v-if="isLoading" aria-hidden="true" />
+            <span>{{ isLoading ? "Enviando código…" : "Continuar" }}</span>
+            <ArrowRight v-if="!isLoading" :size="16" aria-hidden="true" />
+          </button>
         </div>
 
-        <button
-          class="btn-primary"
-          :disabled="!isEmailValid || isLoading"
-          @click="handleSendOtp"
-        >
-          <span>{{ isLoading ? "Enviando código..." : "Continuar" }}</span>
-          <ArrowRight v-if="!isLoading" :size="16" />
-        </button>
-      </template>
+        <!-- ── Paso 2: OTP ───────────────────────────────────────────── -->
+        <div v-else key="otp-step" class="step-content">
+          <p class="step-description">
+            Enviamos un código de 6 dígitos a<br />
+            <strong class="email-highlight">{{ email }}</strong>
+          </p>
 
-      <!-- ── Paso 2: OTP ── -->
-      <template v-else>
-        <p class="subtitle">
-          Enviamos un código de 6 dígitos a <strong>{{ email }}</strong>.
-          Revisa tu bandeja de entrada.
-        </p>
-
-        <div class="input-group">
-          <label for="otp-input">Código de verificación</label>
-          <div class="input-wrapper" :class="{ invalid: otp && !isOtpValid }">
-            <KeyRound :size="16" class="input-icon" />
-            <input
-              id="otp-input"
-              v-model="otp"
-              type="text"
-              inputmode="numeric"
-              maxlength="6"
-              placeholder="123456"
-              autocomplete="one-time-code"
-              :disabled="isLoading"
-              @keydown="handleOtpKeydown"
-            />
+          <div class="form-group">
+            <label for="otp-input" class="form-label">
+              Código de verificación
+            </label>
+            <div
+              class="input-wrapper"
+              :class="{
+                'input-wrapper--invalid': otp && !isOtpValid,
+                'input-wrapper--valid': otp && isOtpValid,
+              }"
+            >
+              <KeyRound :size="15" class="input-icon" aria-hidden="true" />
+              <input
+                id="otp-input"
+                v-model="otp"
+                type="text"
+                inputmode="numeric"
+                maxlength="6"
+                placeholder="• • • • • •"
+                autocomplete="one-time-code"
+                :disabled="isLoading"
+                aria-required="true"
+                :aria-invalid="otp && !isOtpValid ? 'true' : 'false'"
+                aria-describedby="otp-error"
+                @keydown="handleOtpKeydown"
+              />
+            </div>
+            <p
+              v-if="otp && !isOtpValid"
+              id="otp-error"
+              class="field-error"
+              role="alert"
+            >
+              El código debe tener exactamente 6 dígitos.
+            </p>
           </div>
-          <span v-if="otp && !isOtpValid" class="field-error">
-            El código debe tener exactamente 6 dígitos.
-          </span>
+
+          <button
+            type="submit"
+            class="btn-primary"
+            :disabled="!isOtpValid || isLoading"
+            :aria-busy="isLoading"
+            @click="handleVerifyOtp"
+          >
+            <span class="btn-spinner" v-if="isLoading" aria-hidden="true" />
+            <span>{{ isLoading ? "Verificando…" : "Verificar código" }}</span>
+            <ArrowRight v-if="!isLoading" :size="16" aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            class="btn-back"
+            :disabled="isLoading"
+            @click="handleBack"
+          >
+            <RotateCcw :size="13" aria-hidden="true" />
+            <span>Cambiar correo o reenviar código</span>
+          </button>
         </div>
-
-        <button
-          class="btn-primary"
-          :disabled="!isOtpValid || isLoading"
-          @click="handleVerifyOtp"
-        >
-          <span>{{ isLoading ? "Verificando..." : "Verificar código" }}</span>
-          <ArrowRight v-if="!isLoading" :size="16" />
-        </button>
-
-        <button class="btn-back" :disabled="isLoading" @click="handleBack">
-          <RotateCcw :size="14" />
-          <span>Cambiar correo o reenviar código</span>
-        </button>
-      </template>
+      </Transition>
 
       <!-- Error global -->
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="global-error" role="alert" aria-live="assertive">
+        {{ error }}
+      </p>
 
+      <!-- Footer de la card -->
+      <p class="login-footer">
+        Acceso seguro · Sin contraseñas
+      </p>
     </div>
   </div>
 </template>
@@ -160,51 +231,158 @@ const handleOtpKeydown = (e: KeyboardEvent) => {
   justify-content: center;
   height: 100%;
   width: 100%;
+  padding: 1rem;
+  position: relative;
 }
 
+/* ── Toggle tema ─────────────────────────────────────────────────────────────── */
+.theme-toggle {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+}
+
+.theme-toggle:hover {
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-md);
+}
+
+/* ── Card ────────────────────────────────────────────────────────────────────── */
 .login-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.1rem;
+  gap: 1.25rem;
   padding: 2.5rem 2rem;
-  border-radius: 1rem;
-  border: 1px solid #ddd;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.07);
-  max-width: 400px;
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-xl);
+  max-width: 420px;
   width: 100%;
   text-align: center;
+  transition:
+    background-color var(--transition-slow),
+    border-color var(--transition-slow),
+    box-shadow var(--transition-slow);
 }
 
-.login-icon {
-  font-size: 2.5rem;
+/* ── Logo ────────────────────────────────────────────────────────────────────── */
+.login-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-xl);
+  background: var(--avatar-ai-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: var(--shadow-lg);
+  margin-bottom: -0.5rem;
 }
 
-h1 {
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.login-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--color-text-primary);
   margin: 0;
-  font-size: 1.6rem;
+  line-height: 1;
 }
 
-.subtitle {
-  color: #555;
-  margin: 0;
-  font-size: 0.9rem;
+.login-subtitle-badge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  opacity: 0.8;
+}
+
+/* ── Pasos indicator ─────────────────────────────────────────────────────────── */
+.steps-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+  transition: background-color var(--transition-normal), transform var(--transition-normal);
+}
+
+.step-dot.active {
+  background: var(--color-primary);
+  transform: scale(1.2);
+}
+
+.step-line {
+  width: 32px;
+  height: 2px;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+}
+
+/* ── Contenido del paso ──────────────────────────────────────────────────────── */
+.step-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.step-description {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
   line-height: 1.6;
+  margin: 0;
 }
 
-/* ── Input ── */
-.input-group {
+.email-highlight {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+/* ── Formulario ──────────────────────────────────────────────────────────────── */
+.form-group {
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.35rem;
+  gap: 0.375rem;
+  text-align: left;
 }
 
-label {
-  font-size: 0.82rem;
+.form-label {
+  font-size: 0.8125rem;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .input-wrapper {
@@ -212,23 +390,32 @@ label {
   align-items: center;
   gap: 0.5rem;
   width: 100%;
-  border: 1px solid #ccc;
-  border-radius: 0.5rem;
-  padding: 0.55rem 0.75rem;
-  transition: border-color 0.2s;
+  border: 1.5px solid var(--color-input-border);
+  border-radius: var(--radius-lg);
+  padding: 0.625rem 0.875rem;
+  background: var(--color-input-bg);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
   box-sizing: border-box;
 }
 
 .input-wrapper:focus-within {
-  border-color: #3c3c3c;
+  border-color: var(--color-input-focus);
+  box-shadow: var(--shadow-glow);
 }
 
-.input-wrapper.invalid {
-  border-color: #c0392b;
+.input-wrapper--invalid {
+  border-color: var(--color-error) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+.input-wrapper--valid:not(:focus-within) {
+  border-color: var(--color-success);
 }
 
 .input-icon {
-  color: #888;
+  color: var(--color-text-muted);
   flex-shrink: 0;
 }
 
@@ -236,77 +423,139 @@ input {
   flex: 1;
   border: none;
   outline: none;
-  font-size: 0.95rem;
+  font-size: 0.9375rem;
+  font-family: var(--font-sans);
   background: transparent;
-  color: inherit;
+  color: var(--color-text-primary);
   min-width: 0;
 }
 
 input::placeholder {
-  color: #bbb;
+  color: var(--color-text-muted);
 }
 
 input:disabled {
   opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .field-error {
   font-size: 0.75rem;
-  color: #c0392b;
+  color: var(--color-error);
+  margin: 0;
 }
 
-/* ── Botones ── */
+/* ── Botón primario ──────────────────────────────────────────────────────────── */
 .btn-primary {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   width: 100%;
-  padding: 0.65rem 1.25rem;
-  border-radius: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-lg);
   border: none;
-  background-color: #3c3c3c;
+  background: var(--color-primary);
   color: white;
-  font-size: 0.95rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition:
+    background-color var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    opacity var(--transition-fast);
+  box-shadow: var(--shadow-md);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: #4f4f4f;
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-primary:disabled {
-  background-color: #bbb;
+  opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
+/* Spinner del botón */
+.btn-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: white;
+  border-radius: var(--radius-full);
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ── Botón volver ────────────────────────────────────────────────────────────── */
 .btn-back {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.375rem;
   background: none;
   border: none;
-  color: #888;
-  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-family: var(--font-sans);
   cursor: pointer;
-  padding: 0;
-  transition: color 0.2s;
+  padding: 0.25rem 0;
+  transition: color var(--transition-fast);
 }
 
 .btn-back:hover:not(:disabled) {
-  color: #333;
+  color: var(--color-primary);
 }
 
 .btn-back:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
-.error {
-  color: #c0392b;
-  font-size: 0.85rem;
-  margin: 0;
+/* ── Error global ────────────────────────────────────────────────────────────── */
+.global-error {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius-md);
+  background: var(--color-error-subtle);
+  border: 1px solid var(--color-error);
+  color: var(--color-error);
+  font-size: 0.8125rem;
   text-align: center;
+  margin: 0;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────────── */
+.login-footer {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin: 0;
+  padding-top: 0.25rem;
+}
+
+/* ── Transición de pasos ─────────────────────────────────────────────────────── */
+.slide-enter-active,
+.slide-leave-active {
+  transition: opacity var(--transition-normal), transform var(--transition-normal);
+}
+
+.slide-enter-from {
+  opacity: 0;
+  transform: translateX(16px);
+}
+
+.slide-leave-to {
+  opacity: 0;
+  transform: translateX(-16px);
 }
 </style>
